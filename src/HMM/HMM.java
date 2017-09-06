@@ -1,4 +1,7 @@
 package HMM;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.Vector;
 import org.paukov.combinatorics.Factory;
@@ -6,6 +9,7 @@ import org.paukov.combinatorics.Generator;
 import org.paukov.combinatorics.ICombinatoricsVector;
 import org.paukov.combinatorics.util.Util;
 
+@SuppressWarnings("unused")
 public class HMM {
 	double[][] directComputationResult = new double[81][16]; 
 	public int numStates;
@@ -62,8 +66,14 @@ public class HMM {
 //        return this.pi.get(state);
 //    }
 
+	public static void printArray(double matrix[][]) {
+	    for (double[] row : matrix) 
+	        System.out.println(Arrays.toString(row));       
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) throws Exception {
+		NumberFormat nf = new DecimalFormat("0.######");
 		HMM2 hmm2 = new HMM2(2,3);
 		hmm2.a = new double[][]{{0.7,0.3},{0.4,0.6}};
 		hmm2.b = new double[][]{{0.1,0.4,0.5},{0.7,0.2,0.1}};
@@ -74,14 +84,23 @@ public class HMM {
 	    ICombinatoricsVector<Double> stateVector = Factory.createVector(new Double[]{0.0,1.0});
 	    Generator<Double> observationGen = Factory.createPermutationWithRepetitionGenerator(observationVector, 4);
 	    Generator<Double> stateGen = Factory.createPermutationWithRepetitionGenerator(stateVector, 4);
+	    // Brute Force
 	    for (ICombinatoricsVector<Double> ob : observationGen){
 	    	for (ICombinatoricsVector<Double> st : stateGen){
+//	    		double[] stateSequence = st.getVector().stream().mapToDouble(d -> d).toArray();
 	    		double result = hmm2.evaluateUsingBruteForce(st.getVector(), ob.getVector());
-	    		System.out.println("results from using observation sequence " + ob.getVector() +
+	    		System.out.println("Brute Force results from using observation sequence " + ob.getVector() +
 	    							" and state sequence " + st.getVector() +": " + result);
 	    	}
 	    }
+	    //Alpha Pass
+	    for(ICombinatoricsVector<Double> ob: observationGen){
+	    	double[] observationSequence = ob.getVector().stream().mapToDouble(d -> d).toArray(); 
+    		double[][] alphaPass = hmm2.alphaPass(observationSequence);
+    		System.out.println("Alpha Pass Results from observationSequence "+ ob.getVector() +
+    							" with results below:");
+    		printArray(alphaPass);
+	    }
 //		hmm2.evaluateUsingBruteForce(states, observations);
 	}
-
 }

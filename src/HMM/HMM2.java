@@ -1,7 +1,6 @@
 package HMM;
 import java.text.*;
 import java.util.List;
-import java.util.Vector;
 /** This class implements a Hidden Markov Model, as well as
     the Baum-Welch Algorithm for training HMMs.
     @author Holger Wunsch (wunsch@sfs.nphil.uni-tuebingen.de) 
@@ -41,8 +40,8 @@ public class HMM2 {
   */
   public void train(double[] o, int steps) {
     int T = o.length;
-    double[][] fwd;
-    double[][] bwd;
+    double[][] alpha;
+    double[][] beta;
     double pi1[] = new double[numStates];
     double a1[][] = new double[numStates][numStates];
     double b1[][] = new double[numStates][sigmaSize];
@@ -50,19 +49,19 @@ public class HMM2 {
     for (int s = 0; s < steps; s++) {
       /* calculation of Forward- und Backward Variables from the
 	 current model */
-      fwd = forwardProc(o);
-      bwd = backwardProc(o);
+      alpha = alphaPass(o);
+      beta = betaPass(o);
       /* re-estimation of initial state probabilities */
       for (int i = 0; i < numStates; i++)
-    	  pi1[i] = gamma(i, 0, o, fwd, bwd);
+    	  pi1[i] = gamma(i, 0, o, alpha, beta);
       /* re-estimation of transition probabilities */ 
       for (int i = 0; i < numStates; i++) {
 		for (int j = 0; j < numStates; j++) {
 		  double num = 0;
 		  double denom = 0;
 		  for (int t = 0; t <= T - 1; t++) {
-		    num += p(t, i, j, o, fwd, bwd);
-		    denom += gamma(i, t, o, fwd, bwd);
+		    num += p(t, i, j, o, alpha, beta);
+		    denom += gamma(i, t, o, alpha, beta);
 		  }
 		  a1[i][j] = num / denom;
 		}
@@ -73,7 +72,7 @@ public class HMM2 {
 		  double num = 0;
 		  double denom = 0;
 		  for (int t = 0; t <= T - 1; t++) {
-		    double g = gamma(i, t, o, fwd, bwd);
+		    double g = gamma(i, t, o, alpha, beta);
 		    num += g * (k == o[t] ? 1 : 0);
 		    denom += g;
 		  }
@@ -86,58 +85,58 @@ public class HMM2 {
 	  }
   	}
   
-  public double[][] forwardProc(double[] o) {
+  public double[][] alphaPass(double[] o) {
     int T = o.length;
-    double[][] fwd = new double[numStates][T];
+    double[][] alpha = new double[numStates][T];
     /* initialization (time 0) */
     for (int i = 0; i < numStates; i++)
-      fwd[i][0] = pi[i] * b[i][(int) o[0]];
+      alpha[i][0] = pi[i] * b[i][(int) o[0]];
     /* induction */
     for (int t = 0; t <= T-2; t++) {
       for (int j = 0; j < numStates; j++) {
-		fwd[j][t+1] = 0;
+		alpha[j][t+1] = 0;
 		for (int i = 0; i < numStates; i++)
-		  fwd[j][t+1] += (fwd[i][t] * a[i][j]);
-		  fwd[j][t+1] *= b[j][(int) o[t+1]];
+		  alpha[j][t+1] += (alpha[i][t] * a[i][j]);
+		  alpha[j][t+1] *= b[j][(int) o[t+1]];
 	    }
     }
-    return fwd;
+    return alpha;
   }
 
-  public double[][] backwardProc(double[] o) {
+  public double[][] betaPass(double[] o) {
     int T = o.length;
-    double[][] bwd = new double[numStates][T];  
+    double[][] beta = new double[numStates][T];  
     /* initialization (time 0) */
     for (int i = 0; i < numStates; i++)
-      bwd[i][T-1] = 1;
+      beta[i][T-1] = 1;
     /* induction */
     for (int t = T - 2; t >= 0; t--) {
       for (int i = 0; i < numStates; i++) {
-	bwd[i][t] = 0;
+	beta[i][t] = 0;
 	for (int j = 0; j < numStates; j++)
-	  bwd[i][t] += (bwd[j][t+1] * a[i][j] * b[j][(int) o[t+1]]);
+	  beta[i][t] += (beta[j][t+1] * a[i][j] * b[j][(int) o[t+1]]);
       }
     }
-    return bwd;
+    return beta;
   }
 
-  public double p(int t, int i, int j, double[] o, double[][] fwd, double[][] bwd) {
+  public double p(int t, int i, int j, double[] o, double[][] alpha, double[][] beta) {
     double num;
     if (t == o.length - 1)
-      num = fwd[i][t] * a[i][j];
+      num = alpha[i][t] * a[i][j];
     else
-      num = fwd[i][t] * a[i][j] * b[j][(int) o[t+1]] * bwd[j][t+1];
+      num = alpha[i][t] * a[i][j] * b[j][(int) o[t+1]] * beta[j][t+1];
     double denom = 0;
     for (int k = 0; k < numStates; k++)
-      denom += (fwd[k][t] * bwd[k][t]);
+      denom += (alpha[k][t] * beta[k][t]);
     return  num / denom;
   }
 
-  public double gamma(int i, int t, int[] o, double[][] fwd, double[][] bwd) {
-    double num = fwd[i][t] * bwd[i][t];
+  public double gamma(int i, int t, double[] o, double[][] alpha, double[][] beta) {
+    double num = alpha[i][t] * beta[i][t];
     double denom = 0;
     for (int j = 0; j < numStates; j++)
-      denom += fwd[j][t] * bwd[j][t];
+      denom += alpha[j][t] * beta[j][t];
     return  num / denom;
   }
 
@@ -147,22 +146,22 @@ public class HMM2 {
     fmt.setMaximumFractionDigits(5);
     
     for (int i = 0; i < numStates; i++)
-      System.out.println("pi(" + i + ") = " + fmt.format(pi[i]));
-    System.out.println();
+    	System.out.println("pi(" + i + ") = " + fmt.format(pi[i]));
+    	System.out.println();
 
     for (int i = 0; i < numStates; i++) {
-      for (int j = 0; j < numStates; j++)
-	System.out.print("a(" + i + "," + j + ") = " + 
-			 fmt.format(a[i][j]) + "  ");
-      System.out.println();
+    	for (int j = 0; j < numStates; j++)
+    		System.out.print("a(" + i + "," + j + ") = " + 
+    							fmt.format(a[i][j]) + "  ");
+    	System.out.println();
     }
 
     System.out.println();
     for (int i = 0; i < numStates; i++) {
-      for (int k = 0; k < sigmaSize; k++)
-	System.out.print("b(" + i + "," + k + ") = " + 
-			 fmt.format(b[i][k]) + "  ");
-      System.out.println();
+    	for (int k = 0; k < sigmaSize; k++)
+    		System.out.print("b(" + i + "," + k + ") = " + 
+    							fmt.format(b[i][k]) + "  ");
+    	System.out.println();
     }
   }
   
