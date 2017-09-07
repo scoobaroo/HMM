@@ -87,48 +87,71 @@ public class HMM {
 	    int T = o.length;
 	    double[][] alpha;
 	    double[][] beta;
+	    double[][] gamma;
+	    double[][][] digamma;
 	    double pi1[] = new double[N];
 	    double a1[][] = new double[N][N];
 	    double b1[][] = new double[N][M];
+	    alpha = alphaPass(o);
+	    beta = betaPass(o);
+	    gamma = gamma(o,alpha,beta);
+	    digamma = digamma(o,alpha,beta);
+	    double numer;
+	    double denom;
+	    //reestimate pi
+	    for ( int i =0; i< N ; i++) {
+	    		pi[i] = gamma[i][0];
+	    }
+	    //reestimate a
+	    for ( int i = 0 ; i< N; i++) {
+	    		for( int j=0; j< N; j++) {
+	    			numer= 0;
+	    			denom= 0;
+	    			for( int t = 0; t< T-1; t++) {
+					numer+= digamma[i][j][t];
+					denom+= gamma[i][t];
+	    			}
+	    			a[i][j] = numer/denom;
+	    		}
+	    }
+	    //reestimate b
+	    for( int i = 0; i < N; i++) {
+	    		for(int j = 0; j < M; j++) {
+	    			numer = 0;
+	    			denom = 0;
+	    			for( int t = 0 ; t < T ; t++) {
+	    				if( (int) o[t] == j ) {
+	    					numer += gamma[i][t];
+	    				}
+	    				denom += gamma[i][t];
+	    			}
+	    			b[i][j] = numer/denom;
+	    		}
+	    }
+	  }
 
-	    for (int s = 0; s < steps; s++) {
-	      /* calculation of alpha and beta from current model */
-	      alpha = alphaPass(o);
-	      beta = betaPass(o);
-	      /* re-estimation of pi */
-	      for (int i = 0; i < N; i++)
-	    	  pi1[i] = gamma(i, 0, o, alpha, beta);
-	      /* re-estimation of A */ 
-	      for (int i = 0; i < N; i++) {
-			for (int j = 0; j < N; j++) {
-			  double num = 0;
-			  double denom = 0;
-			  for (int t = 0; t <= T - 1; t++) {
-			    num += p(t, i, j, o, alpha, beta);
-			    denom += gamma(o, alpha, beta);
-			  }
-			  a1[i][j] =  divide(num,denom);
+	  public double[][][] digamma(double[] o, double[][] alpha, double[][] beta){
+		  int T = o.length;
+		  double denom;
+		  double[][] gamma = new double[N][T];
+		  double[][][] digamma = new double[N][N][T];
+		  for( int t = 0 ; t<T-1; t++) {
+			denom = 0.0;
+			for( int i = 0; i<N ; i++) {
+				for( int j = 0; j< N; j++) {
+					denom += alpha[i][t] * a[i][j] * b[j][(int) o[t+1]] * beta[j][t+1];
+				}
 			}
-	      }
-	      /* re-estimation of B  */
-	      for (int i = 0; i < N; i++) {
-			for (int k = 0; k < M; k++) {
-			  double num = 0;
-			  double denom = 0;
-			  for (int t = 0; t <= T - 1; t++) {
-			    double[][] g = gamma(o, alpha, beta);
-			    num += g * (k == o[t] ? 1 : 0);
-			    denom += g;
-			  }
-			  b1[i][k] =  divide(num,denom);;
+			for( int i = 0; i<N; i++) {
+				gamma[i][t] = 0;
+				for ( int j = 0; j<N ; j++) {
+					digamma[i][j][t] = (alpha[i][t] * a[i][j] * b[j][(int) o[t+1]]) / denom;
+					gamma[i][t] += digamma[i][j][t];
+				}
 			}
-	      }
-	      pi = pi1;
-	      a = a1;
-	      b = b1;
 		  }
-	  	}
-
+		  return digamma;
+	  }
 	  public double[][] gamma(double[] o, double[][] alpha, double[][] beta) {
 		  int T = o.length;
 		  double denom;
@@ -282,14 +305,33 @@ public class HMM {
 		    System.out.println("double array: ");
 		    printArray(doubleArr);
 	    }
-	    hmmtext.print();
-	    hmmtext.train(doubleArr, 100);
-//	    printMatrix(hmmtext.alphaPass(doubleArr));
-//	    printMatrix(hmmtext.betaPass(doubleArr));
-	    hmmtext.print();
-//		printMatrix(hmmtext.a);
-//		printMatrix(hmmtext.b);
-//		printArray(hmmtext.pi);
+//	    hmmtext.print();
+//	    hmmtext.train(doubleArr, 100);
+//	    hmmtext.print();
+	    HMM hmmtext2 = new HMM(3, 27);
+		hmmtext2.a = new double[][]{{0.45,0.55},{0.25,0.75}};
+		hmmtext2.b = new double[][]{
+			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
+			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
+		hmmtext2.pi = new double[]{0.35,0.65};
+		hmmtext2.train(doubleArr, 100);
+		hmmtext2.print();
+//		HMM hmmtext3 = new HMM(4, 27);
+//		hmmtext3.a = new double[][]{{0.45,0.55},{0.25,0.75}};
+//		hmmtext3.b = new double[][]{
+//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
+//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
+//		hmmtext3.pi = new double[]{0.35,0.65};
+//		hmmtext3.train(doubleArr, 100);
+//		hmmtext3.print();
+//		HMM hmmtext4 = new HMM(26, 27);
+//		hmmtext4.a = new double[][]{{0.45,0.55},{0.25,0.75}};
+//		hmmtext4.b = new double[][]{
+//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
+//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
+//		hmmtext4.pi = new double[]{0.35,0.65};
+//		hmmtext4.train(doubleArr, 100);
+//		hmmtext4.print();
 	}
 
 	static int[] addElement(int[] a, int e) {
