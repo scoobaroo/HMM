@@ -11,6 +11,13 @@ public class Pair<A, B> {
         this.second = second;
     }
 
+    @Override public boolean equals(Object o) {
+        if(this == o) return true;
+        if(!(o instanceof Pair)) return false;
+        Pair<?,?> p = (Pair<?, ?>)o;
+        return p.first == first && p.second == second;
+    }
+    @Override
     public int hashCode() {
         int hashFirst = first != null ? first.hashCode() : 0;
         int hashSecond = second != null ? second.hashCode() : 0;

@@ -3,9 +3,15 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Vector;
 import org.paukov.combinatorics.Factory;
 import org.paukov.combinatorics.Generator;
@@ -27,7 +33,7 @@ public class HMM {
 	    a = new double[N][N];
 	    b = new double[N][M];
 	  }
-	
+	  double[] c = new double[50000];
 	  double[] c2 = new double[50000];
 	  public double[][] alphaPass(double[] o){
 		  int T = o.length;
@@ -83,53 +89,127 @@ public class HMM {
 	    return beta;
 	  }
 // Baum-Welch Algorithm
+	  public void trainWithoutA(double[] o, int steps) {
+		    int T = o.length;
+		    double[][] alpha;
+		    double[][] beta;
+		    double[][] gamma;
+		    double[][][] digamma;
+		    double delta = 0.0;
+		    double epsilon = 0.0005;
+		    double logProb = 0.0;
+		    double oldLogProb = Double.NEGATIVE_INFINITY;
+		    for ( int s = 0; s< steps; s++) {
+			    logProb = computeLogProb(o);
+		    		delta = Math.abs(logProb - oldLogProb);
+		    		if (s<steps || delta> epsilon) {
+				    oldLogProb = logProb;
+		    			reestimateWithoutA(o);
+		    		}
+		    }
+		  }
 	  public void train(double[] o, int steps) {
 	    int T = o.length;
 	    double[][] alpha;
 	    double[][] beta;
 	    double[][] gamma;
 	    double[][][] digamma;
-	    double pi1[] = new double[N];
-	    double a1[][] = new double[N][N];
-	    double b1[][] = new double[N][M];
-	    alpha = alphaPass(o);
-	    beta = betaPass(o);
-	    gamma = gamma(o,alpha,beta);
-	    digamma = digamma(o,alpha,beta);
-	    double numer;
-	    double denom;
-	    //reestimate pi
-	    for ( int i =0; i< N ; i++) {
-	    		pi[i] = gamma[i][0];
-	    }
-	    //reestimate a
-	    for ( int i = 0 ; i< N; i++) {
-	    		for( int j=0; j< N; j++) {
-	    			numer= 0;
-	    			denom= 0;
-	    			for( int t = 0; t< T-1; t++) {
-					numer+= digamma[i][j][t];
-					denom+= gamma[i][t];
-	    			}
-	    			a[i][j] = divide(numer,denom);
-	    		}
-	    }
-	    //reestimate b
-	    for( int i = 0; i < N; i++) {
-	    		for(int j = 0; j < M; j++) {
-	    			numer = 0;
-	    			denom = 0;
-	    			for( int t = 0 ; t < T ; t++) {
-	    				if( (int) o[t] == j ) {
-	    					numer += gamma[i][t];
-	    				}
-	    				denom += gamma[i][t];
-	    			}
-	    			b[i][j] = divide(numer,denom);
+	    double delta = 0.0;
+	    double epsilon = 0.0005;
+	    double logProb = 0.0;
+	    double oldLogProb = Double.NEGATIVE_INFINITY;
+	    for ( int s = 0; s< steps; s++) {
+		    logProb = computeLogProb(o);
+	    		delta = Math.abs(logProb - oldLogProb);
+	    		if (s<steps || delta> epsilon) {
+			    oldLogProb = logProb;
+	    			reestimate(o);
 	    		}
 	    }
 	  }
-
+	  public void reestimateWithoutA(double[] o) {
+		  	int T = o.length;
+		    double[][] alpha;
+		    double[][] beta;
+		    double[][] gamma;
+		    double[][][] digamma;
+		    alpha = alphaPass(o);
+		    beta = betaPass(o);
+		    gamma = gamma(o,alpha,beta);
+		    digamma = digamma(o,alpha,beta);
+		    double numer;
+		    double denom;
+		    //reestimate pi
+		    for ( int i =0; i< N ; i++) {
+		    		pi[i] = gamma[i][0];
+		    }
+		    //reestimate b
+		    for( int i = 0; i < N; i++) {
+		    		for(int j = 0; j < M; j++) {
+		    			numer = 0;
+		    			denom = 0;
+		    			for( int t = 0 ; t < T ; t++) {
+		    				if( (int) o[t] == j ) {
+		    					numer += gamma[i][t];
+		    				}
+		    				denom += gamma[i][t];
+		    			}
+		    			b[i][j] = divide(numer,denom);
+		    		}
+		    }
+	  }
+	  public void reestimate(double[] o) {
+		  	int T = o.length;
+		    double[][] alpha;
+		    double[][] beta;
+		    double[][] gamma;
+		    double[][][] digamma;
+		    alpha = alphaPass(o);
+		    beta = betaPass(o);
+		    gamma = gamma(o,alpha,beta);
+		    digamma = digamma(o,alpha,beta);
+		    double numer;
+		    double denom;
+		    //reestimate pi
+		    for ( int i =0; i< N ; i++) {
+		    		pi[i] = gamma[i][0];
+		    }
+		    //reestimate a
+		    for ( int i = 0 ; i< N; i++) {
+		    		for( int j=0; j< N; j++) {
+		    			numer= 0;
+		    			denom= 0;
+		    			for( int t = 0; t< T-1; t++) {
+						numer+= digamma[i][j][t];
+						denom+= gamma[i][t];
+		    			}
+		    			a[i][j] = divide(numer,denom);
+		    		}
+		    }
+		    //reestimate b
+		    for( int i = 0; i < N; i++) {
+		    		for(int j = 0; j < M; j++) {
+		    			numer = 0;
+		    			denom = 0;
+		    			for( int t = 0 ; t < T ; t++) {
+		    				if( (int) o[t] == j ) {
+		    					numer += gamma[i][t];
+		    				}
+		    				denom += gamma[i][t];
+		    			}
+		    			b[i][j] = divide(numer,denom);
+		    		}
+		    }
+	  }
+	  public double computeLogProb(double[] o) {
+		  int T = o.length;
+		  double logProb = 0.0;
+		  for (int i = 0; i<T-1; i++) {
+			  logProb = logProb + Math.log(c[i]);
+		  }
+		  logProb = -logProb;
+		  return logProb;
+	  }
 	  public double[][][] digamma(double[] o, double[][] alpha, double[][] beta){
 		  int T = o.length;
 		  double denom;
@@ -181,28 +261,42 @@ public class HMM {
 		  }
 		  return gamma;
 	  }
-	  
+
 	  public void print() {
 		NumberFormat formatter = new DecimalFormat("#.#####"); 
 		System.out.println();
 	    for (int i = 0; i < N; i++)
 	    	System.out.println("pi[" + i + "]: " + formatter.format(pi[i]));
-	    	System.out.println();
 
+	    	double[] atotal = new double[N];
+	    	double[] btotal = new double[N];
+	    	double pitotal = 0.0;
+		for(int z = 0; z< pi.length; z++) {
+	    		pitotal += pi[z];
+	    }
+		System.out.println("total for pi: "+ pitotal);
+    		System.out.println();
 	    for (int i = 0; i < N; i++) {
+	    		atotal[i] = 0.0;
 		    	for (int j = 0; j < N; j++) {
 		    		System.out.print("a[" + i + "," + j + "]: " + formatter.format(a[i][j]) + "  ");
+		    		atotal[i] += a[i][j];
 		    	}
-	    		System.out.println();
+		    	System.out.println();
+	    		System.out.println("total for a for row "+i+": "+atotal[i]);
 	    }
 
 	    System.out.println();
 	    for (int i = 0; i < N; i++) {
-		    	for (int k = 0; k < M; k++)
+	    		btotal[i] = 0.0;
+		    	for (int k = 0; k < M; k++) {
 		    		System.out.print("b[" + i + "," + k + "]: " + formatter.format(b[i][k]) + "  ");
-		    		System.out.println();
+		    		btotal[i] += b[i][k];
 		    }
+		    	System.out.println();
+	    		System.out.println("total for b for row " + i + ": " + btotal[i]);
 	  	}
+	  }
 	  
 	  public double divide(double n, double d) {
 	    if (n == 0)
@@ -211,31 +305,41 @@ public class HMM {
 	      return n / d;
 	  }
 	  
-	public double evaluateUsingBruteForce(List<Double> states, List<Double> observations) throws Exception{
-      if (states.size() != observations.size())
-          throw new Exception("States and Observations must be at a same size!");
-      double previousState = 0.0;
-      double probability = 0.0;
-      double result = 0.0;
- 	  for (int i = 0; i<states.size(); i++){
- 		  previousState=0.0;
- 		  probability = pi[states.get(i).intValue()];
- 		  for(int j = 0; j<observations.size(); j++){
- 			  double emissionValue = b[states.get(j).intValue()][observations.get(j).intValue()];
- 			  double transitionValue = 0.0;
- 			  if(j!=0){
- 				  transitionValue += a[(int) previousState][states.get(j).intValue()];
- 			      probability *= transitionValue * emissionValue;
- 			  }
- 			  previousState = states.get(j).intValue();
- 		  }
- 		  result+=probability;
- 	  }
- 	  return result;
-  }  
+	  public double evaluateUsingBruteForce(List<Double> states, List<Double> observations) throws Exception{
+		  if (states.size() != observations.size())
+		      throw new Exception("States and Observations must be at a same size!");
+		  double previousState = 0.0;
+		  double probability = 0.0;
+		  double result = 0.0;
+		  for (int i = 0; i<states.size(); i++){
+			  previousState=0.0;
+			  probability = pi[states.get(i).intValue()];
+			  for(int j = 0; j<observations.size(); j++){
+				  double emissionValue = b[states.get(j).intValue()][observations.get(j).intValue()];
+				  double transitionValue = 0.0;
+				  if(j!=0){
+					  transitionValue += a[(int) previousState][states.get(j).intValue()];
+				      probability *= transitionValue * emissionValue;
+				  }
+				  previousState = states.get(j).intValue();
+			  }
+			  result+=probability;
+		  }
+		  return result;
+	  }  
 	public static void printMatrix(double[][] matrix) {
 		System.out.println("Matrix size: " +matrix.length + " x " + matrix[0].length);
 	    for (double[] row : matrix) 
+	        System.out.println(Arrays.toString(row));       
+	}
+	public static void printMatrixInteger(Integer[][] matrix) {
+		System.out.println("Matrix size: " +matrix.length + " x " + matrix[0].length);
+	    for (Integer[] row : matrix) 
+	        System.out.println(Arrays.toString(row));       
+	}
+	public static void printMatrixString(String[][] matrix) {
+		System.out.println("Matrix size: " +matrix.length + " x " + matrix[0].length);
+	    for (String[] row : matrix) 
 	        System.out.println(Arrays.toString(row));       
 	}
 	public static void printArray(double[] array) {
@@ -244,7 +348,38 @@ public class HMM {
 	        System.out.print(element + " ");
 	    }
 	}
-	@SuppressWarnings("unchecked")
+	public static void printArrayString(String[] array) {
+		System.out.println("Array Length: "+array.length);
+	    for (String s : array) {
+	        System.out.print(s + " ");
+	    }
+	}
+	static String cipher(String msg, int shift){
+	    String s = "";
+	    int len = msg.length();
+	    for(int x = 0; x < len; x++){
+	        char c = (char)(msg.charAt(x) + shift);
+	        if (c > 'z')
+	            s += (char)(msg.charAt(x) - (26-shift));
+	        else
+	            s += (char)(msg.charAt(x) + shift);
+	    }
+	    return s;
+	}
+	public static String[] split(String string) {
+		String[] stringArray = new String[string.length() *2];
+		String[] stringArray2 = new String[string.length() *2];
+		stringArray = string.split("");
+		for(int i = 0; i < string.length(); i++) {
+			if(i < string.length() - 1) {
+				String firstChar = stringArray[i];
+				String secondChar = stringArray[i+1];
+				String finalStr = firstChar + secondChar;
+				stringArray2[i] = finalStr;
+			}
+		}
+		return stringArray2;
+	}
 	public static void main(String[] args) throws Exception {
 		NumberFormat nf = new DecimalFormat("0.######");
 		HMM hmm = new HMM(2,3);
@@ -277,13 +412,14 @@ public class HMM {
 	    }
 	    //Problem 10
 	    HMM hmmtext = new HMM(2, 27);
-		hmmtext.a = new double[][]{{0.45,0.55},{0.25,0.75}};
-		hmmtext.b = new double[][]{
-			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
-		hmmtext.pi = new double[]{0.35,0.65};
+	    SeedGenerator sg  = new SeedGenerator();
+		hmmtext.a = new double[][]{sg.generate(2), sg.generate(2)};
+		hmmtext.b = new double[][]{sg.generate(27), sg.generate(27)};
+		hmmtext.pi = sg.generate(2);
 		System.out.println("");
+		String everything;
 		double[] doubleArr = {};
+		String[] everythingArr = {};
 	    try(BufferedReader br = new BufferedReader(new FileReader("resources/BrownCorpus"))) {
 	        StringBuilder sb = new StringBuilder();
 	        String line = br.readLine();
@@ -293,10 +429,17 @@ public class HMM {
 	            sb.append(line);
 	            line = br.readLine();
 	        }
-	        String everything = sb.toString();
+	        everything = sb.toString();
 	        everything = everything.trim().replaceAll(" +", " ");
+	        // remove below line if you want spaces, keep it if you want to remove them
+	        everything = everything.trim().replaceAll(" ", "");
+	        
 	        everything = everything.substring(0,50000);
 	        System.out.println(everything);
+	        //generate cipher text with alphabet shift of 3
+	        everything = cipher(everything,3);
+	        everything = everything.replace("#", " ");
+	        everythingArr = split(everything);
 	        String[] corpusArr = everything.split("");
 		    for(String s:corpusArr){
 		    		int num ="abcdefghijklmnopqrstuvwxyz ".indexOf(s);
@@ -305,83 +448,125 @@ public class HMM {
 		    System.out.println("double array: ");
 		    printArray(doubleArr);
 	    }
-	    hmmtext.train(doubleArr, 100);
-	    hmmtext.print();
+	    System.out.println();
+	    System.out.println(everything);
+	    for( double num : doubleArr) {
+    			char character = "abcdefghijklmnopqrstuvwxyz ".charAt((int) num);
+    			System.out.print(character);
+	    }
+//	    hmmtext.train(doubleArr, 100);
+//	    hmmtext.print();
+	    ArrayList<String> stringArr = new ArrayList<>(); 
+	    String[][] digraph = new String[26][26];
+	    for (int i = 0; i<26; i++) {
+	    		for(int j = 0; j<26; j++) {
+	    			char first = "abcdefghijklmnopqrstuvwxyz ".charAt(i);
+	    			char second = "abcdefghijklmnopqrstuvwxyz ".charAt(j);
+	    			digraph[i][j]= ""+first+second;
+	    			stringArr.add("" +first+second);
+	    		}
+	    }
+//	    printMatrixString(digraph);
+	    for(String s : stringArr) {
+	    		System.out.print(s+" ");
+	    }
+	    Map<String, Integer> hashmap = new HashMap<String, Integer>();
+	    for(int i = 0; i< stringArr.size(); i++) {
+	    		hashmap.put(stringArr.get(i),0);
+	    }
+//	    System.out.println();
+//	    System.out.println(Collections.singletonList(hashmap));
+	    Map<Pair<Character,Character>,Double> map = new LinkedHashMap<Pair<Character,Character>, Double>();
+	    for (int i = 0; i<26; i++) {
+	    		for(int j = 0; j<26; j++) {
+	    			char first = "abcdefghijklmnopqrstuvwxyz ".charAt(i);
+	    			char second = "abcdefghijklmnopqrstuvwxyz ".charAt(j);
+	    			Pair<Character,Character> p = new Pair<Character, Character>(first,second);
+	    			map.put(p, (double) 0);
+	    		}
+	    }
+	    printArrayString(everythingArr);	   
+	    System.out.println();
+	    for(int i = 0; i<everythingArr.length; i++) {
+	    		String elem = everythingArr[i];
+	    		if(elem != null) {
+	    			char[] charArr = elem.toCharArray();
+		    		Pair<Character,Character> pair = new Pair<Character,Character>(charArr[0], charArr[1]);
+		    		map.put(pair, map.get(pair)+1);
+	    		}
+	    }
+	    //add 5 to each element in everythingArr
+	    for(Entry<Pair<Character, Character>, Double> entry: map.entrySet()) {
+	    		double value = entry.getValue();
+	    		value +=5;
+	    		map.put(entry.getKey(), value);
+	    }
+	    System.out.println(Collections.singletonList(map));
+	    int rowSum = 0;
+	    double[][] charArr = new double[26][26];
+	    for( Entry<Pair<Character, Character>, Double> entry: map.entrySet()) {
+	    		char first = entry.getKey().getFirst();
+	    		char second = entry.getKey().getSecond();
+	    		double firstInt = Double.valueOf("abcdefghijklmnopqrstuvwxyz".indexOf(String.valueOf(first)));
+	    		double secondInt = Double.valueOf("abcdefghijklmnopqrstuvwxyz".indexOf(String.valueOf(second)));
+	    		charArr[(int) firstInt][(int) secondInt]= entry.getValue();
+	    }
+	    double[][] newCharArr = new double[26][26];
+	    for(int i = 0; i< charArr.length; i++) {
+	    		int total = 0;
+	    		for( int j = 0; j< charArr[0].length; j++) {
+	    			total+=charArr[i][j];
+	    		}
+	    		for(int k = 0 ; k<charArr[0].length; k++) {
+	    			double newValue =  charArr[i][k]/Double.valueOf(total);
+	    			newCharArr[i][k]= newValue;
+	    		}
+	    }
+	    printMatrix(newCharArr);
+//	    for(double[] row : newCharArr) {
+//	    		double total = 0.0;
+//	    		for(double elem: row) {
+//	    			total+=elem;
+//	    		}
+//	    		System.out.println("total for row :"+ total);
+//	    }
+	    HMM hmmDigraph = new HMM(26,26);
+	    hmmDigraph.a = newCharArr;
+	    hmmDigraph.b = new double[][] { sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+	    									sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+	    									sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+	    									sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+	    									sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+	    									sg.generate(26)};
+	    hmmDigraph.pi = sg.generate(26);
+	    hmmDigraph.trainWithoutA(doubleArr, 100);
+	    hmmDigraph.print();
 //	    HMM hmmtext2 = new HMM(3, 27);
-//		hmmtext2.a = new double[][]{{0.33,0.33,0.34},{0.33,0.33,0.34},{0.33,0.33,0.34},{0.33,0.33,0.34}};
-//		hmmtext2.b = new double[][]{
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},};
-//		hmmtext2.pi = new double[]{0.33,0.33,0.34};
+//		hmmtext2.a = new double[][]{sg.generate(3),sg.generate(3),sg.generate(3)};
+//		hmmtext2.b = new double[][]{sg.generate(27), sg.generate(27), sg.generate(27)};
+//		hmmtext2.pi = sg.generate(3);
 //		hmmtext2.train(doubleArr, 100);
 //		hmmtext2.print();
 //		HMM hmmtext3 = new HMM(4, 27);
-//		hmmtext3.a = new double[][]{{0.24,0.26,0.27,0.23},{0.24,0.26,0.27,0.23},{0.24,0.26,0.27,0.23},{0.24,0.26,0.27,0.23}};
-//		hmmtext3.b = new double[][]{
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
-//		hmmtext3.pi = new double[]{0.3,0.2,0.25,0.25};
+//		hmmtext3.a = new double[][]{sg.generate(4),sg.generate(4),sg.generate(4),sg.generate(4)};
+//		hmmtext3.b = new double[][]{sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27)};
+//		hmmtext3.pi = sg.generate(4);
 //		hmmtext3.train(doubleArr, 100);
 //		hmmtext3.print();
 //		HMM hmmtext4 = new HMM(26, 27);
-//		hmmtext4.a = new double[][]{
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037}};
-//		hmmtext4.b = new double[][]{
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037},
-//			{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037,0.037}};
-//		hmmtext4.pi = new double[]{0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.039,0.035,0.035,0.036,0.038,0.039,0.037,0.037};
+//		hmmtext4.a = new double[][]{ sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+//		 							sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+//		 							 sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+//		 							 sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+//		 							 sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26), sg.generate(26),
+//		 							 sg.generate(26)};
+//		hmmtext4.b = new double[][]{ sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27),
+//			 						sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27),
+//			 						 sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27),
+//			 						 sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27),
+//			 						 sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27), sg.generate(27),
+//			 						 sg.generate(27), sg.generate(27)};
+//		hmmtext4.pi = sg.generate(26);
 //		hmmtext4.train(doubleArr, 100);
 //		hmmtext4.print();
 	}
